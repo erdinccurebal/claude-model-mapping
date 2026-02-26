@@ -7,7 +7,7 @@ import https from 'node:https';
 import http from 'node:http';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
-import { logError } from '../logger';
+import { log, logError } from '../logger';
 import {
   CODE_ASSIST_HOST,
   CODE_ASSIST_API_VERSION,
@@ -251,6 +251,20 @@ function codeAssistGetOperation(name: string, accessToken: string): Promise<any>
   });
 }
 
+// ─── Rate Limit Handling ───
+
+const MAX_429_RETRIES = 3;
+
+/**
+ * Extract wait seconds from Gemini 429 error body.
+ * Looks for "Your quota will reset after Xs." pattern.
+ */
+function parseRetryAfterSeconds(errorBody: string): number {
+  const match = errorBody.match(/reset after (\d+)s/);
+  if (match) return parseInt(match[1]);
+  return 10; // default fallback
+}
+
 // ─── Request Handling ───
 
 function buildCodeAssistRequest(geminiReq: any, model: string): any {
@@ -323,6 +337,15 @@ export async function handleGeminiStreaming(
         if (geminiRes.statusCode === 401 && _retryCount < 1) {
           cachedToken = null;
           retryStreaming(anthropicReq, targetModel, clientRes, _retryCount);
+          return;
+        }
+
+        if (geminiRes.statusCode === 429 && _retryCount < MAX_429_RETRIES) {
+          const waitSec = parseRetryAfterSeconds(errorData);
+          log(`[RATE LIMITED] Waiting ${waitSec}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
+          setTimeout(() => {
+            handleGeminiStreaming(anthropicReq, targetModel, clientRes, _retryCount + 1);
+          }, waitSec * 1000);
           return;
         }
 
@@ -460,6 +483,15 @@ export async function handleGeminiNonStreaming(
           logError(`[GEMINI RETRY FAILED] ${err.message}`);
           sendError(clientRes, 502, 'authentication_error', `Token refresh failed: ${err.message}`);
         }
+        return;
+      }
+
+      if (geminiRes.statusCode === 429 && _retryCount < MAX_429_RETRIES) {
+        const waitSec = parseRetryAfterSeconds(data);
+        log(`[RATE LIMITED] Waiting ${waitSec}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
+        setTimeout(() => {
+          handleGeminiNonStreaming(anthropicReq, targetModel, clientRes, _retryCount + 1);
+        }, waitSec * 1000);
         return;
       }
 
