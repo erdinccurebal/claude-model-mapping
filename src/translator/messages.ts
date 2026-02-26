@@ -11,6 +11,7 @@ export interface AnthropicContentBlock {
   type: string;
   text?: string;
   thinking?: string;
+  signature?: string;
   id?: string;
   name?: string;
   input?: any;
@@ -51,6 +52,7 @@ export interface GeminiContent {
 export interface GeminiPart {
   text?: string;
   thought?: boolean;
+  thoughtSignature?: string;
   functionCall?: { name: string; args: any };
   functionResponse?: { name: string; response: any };
   inlineData?: { mimeType: string; data: string };
@@ -111,6 +113,7 @@ export function anthropicToGemini(req: AnthropicRequest): GeminiRequest {
     const geminiRole: 'user' | 'model' = msg.role === 'assistant' ? 'model' : 'user';
     const blocks = normalizeContent(msg.content);
     const parts: GeminiPart[] = [];
+    let pendingThoughtSignature: string | undefined;
 
     for (const block of blocks) {
       switch (block.type) {
@@ -118,6 +121,7 @@ export function anthropicToGemini(req: AnthropicRequest): GeminiRequest {
           if (block.text) {
             parts.push({ text: block.text });
           }
+          pendingThoughtSignature = undefined;
           break;
 
         case 'thinking':
@@ -125,16 +129,25 @@ export function anthropicToGemini(req: AnthropicRequest): GeminiRequest {
           if (block.thinking) {
             parts.push({ text: block.thinking, thought: true } as GeminiPart);
           }
+          // Capture signature for the next functionCall part
+          pendingThoughtSignature = block.signature;
           break;
 
-        case 'tool_use':
-          parts.push({
+        case 'tool_use': {
+          const part: GeminiPart = {
             functionCall: {
               name: block.name!,
               args: block.input || {},
             },
-          });
+          };
+          // Attach thoughtSignature from preceding thinking block
+          if (pendingThoughtSignature) {
+            part.thoughtSignature = pendingThoughtSignature;
+            pendingThoughtSignature = undefined;
+          }
+          parts.push(part);
           break;
+        }
 
         case 'tool_result': {
           const toolName = toolIdMap.get(block.tool_use_id!) || 'unknown_tool';
