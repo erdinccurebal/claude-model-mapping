@@ -10,14 +10,29 @@ import { handleGeminiStreaming, handleGeminiNonStreaming } from './providers/gem
 import { AnthropicRequest } from './translator/messages';
 import { log } from './logger';
 
+const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
+
 export function createRouter(mapping: MappingConfig) {
   return function handleRequest(
     req: http.IncomingMessage,
     res: http.ServerResponse
   ): void {
     const bodyChunks: Buffer[] = [];
+    let bodySize = 0;
 
-    req.on('data', (chunk: Buffer) => bodyChunks.push(chunk));
+    req.on('data', (chunk: Buffer) => {
+      bodySize += chunk.length;
+      if (bodySize > MAX_BODY_SIZE) {
+        req.destroy();
+        res.writeHead(413, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({
+          type: 'error',
+          error: { type: 'api_error', message: 'Request body too large' },
+        }));
+        return;
+      }
+      bodyChunks.push(chunk);
+    });
 
     req.on('end', () => {
       const rawBody = Buffer.concat(bodyChunks);

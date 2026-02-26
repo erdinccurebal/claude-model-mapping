@@ -60,11 +60,13 @@ program
 
     if (pidExists) {
       const pid = parseInt(fs.readFileSync(PID_FILE_PATH, 'utf-8').trim());
-      try {
-        process.kill(pid, 0); // Check if process exists
-        running = true;
-      } catch {
-        // Process not running, stale PID file
+      if (!isNaN(pid) && pid > 0) {
+        try {
+          process.kill(pid, 0); // Check if process exists
+          running = true;
+        } catch {
+          // Process not running, stale PID file
+        }
       }
     }
 
@@ -246,7 +248,7 @@ function cleanup(): void {
   if (fs.existsSync(PID_FILE_PATH)) {
     // Check if we should kill the process
     const pid = parseInt(fs.readFileSync(PID_FILE_PATH, 'utf-8').trim());
-    if (pid !== process.pid) {
+    if (!isNaN(pid) && pid > 0 && pid !== process.pid) {
       try {
         process.kill(pid, 'SIGTERM');
         console.log(`🔌 cmm process (PID ${pid}) stopped`);

@@ -101,6 +101,9 @@ function refreshToken(
         });
       }
     );
+    req.setTimeout(10_000, () => {
+      req.destroy(new Error('OAuth refresh request timeout (10s)'));
+    });
     req.on('error', reject);
     req.write(postData);
     req.end();

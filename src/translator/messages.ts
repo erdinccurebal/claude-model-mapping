@@ -259,10 +259,13 @@ const GEMINI_ALLOWED_SCHEMA_KEYS = new Set([
   'pattern', 'default', 'example', 'title', 'anyOf', 'oneOf',
 ]);
 
-function cleanSchema(schema: any, isPropertyMap = false): any {
+const MAX_SCHEMA_DEPTH = 32;
+
+function cleanSchema(schema: any, isPropertyMap = false, depth = 0): any {
   if (!schema || typeof schema !== 'object') return schema;
+  if (depth > MAX_SCHEMA_DEPTH) return schema;
   if (Array.isArray(schema)) {
-    return schema.map((v) => (typeof v === 'object' && v !== null ? cleanSchema(v) : v));
+    return schema.map((v) => (typeof v === 'object' && v !== null ? cleanSchema(v, false, depth + 1) : v));
   }
 
   const cleaned: any = {};
@@ -271,7 +274,7 @@ function cleanSchema(schema: any, isPropertyMap = false): any {
     if (!isPropertyMap && !GEMINI_ALLOWED_SCHEMA_KEYS.has(key)) continue;
     if (typeof value === 'object' && value !== null) {
       // "properties" is a map of name → schema, so recurse with isPropertyMap=true
-      cleaned[key] = cleanSchema(value, key === 'properties');
+      cleaned[key] = cleanSchema(value, key === 'properties', depth + 1);
     } else {
       cleaned[key] = value;
     }

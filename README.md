@@ -132,6 +132,20 @@ Removes certificates, Keychain entry, `NODE_EXTRA_CA_CERTS` from `.zshrc`, and t
 
 Non-messages endpoints (`/v1/models`, `/api/oauth/*`, etc.) always pass through.
 
+### Verifying interception
+
+Intercepted responses include an `x-cmm-provider: gemini` header. You can check it in logs or with `curl`:
+
+```bash
+curl -s -D- https://api.anthropic.com/v1/messages \
+  --cacert ~/.cmm/ca.crt \
+  -H "x-api-key: $ANTHROPIC_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "content-type: application/json" \
+  -d '{"model":"claude-haiku-4-5-20251001","max_tokens":50,"stream":false,"messages":[{"role":"user","content":"hi"}]}' \
+  2>&1 | grep x-cmm-provider
+```
+
 ## Logs
 
 Live logs appear in the terminal:

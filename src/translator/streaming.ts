@@ -252,11 +252,17 @@ export class StreamTranslator {
 /**
  * Parse SSE text into individual data objects
  */
+const MAX_SSE_BUFFER = 5 * 1024 * 1024; // 5 MB
+
 export class SSEParser {
   private buffer = '';
 
   feed(chunk: string): any[] {
     this.buffer += chunk;
+    if (this.buffer.length > MAX_SSE_BUFFER) {
+      this.buffer = '';
+      throw new Error('SSE buffer overflow — response too large');
+    }
     return this.extractEvents();
   }
 
