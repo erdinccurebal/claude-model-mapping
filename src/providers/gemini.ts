@@ -14,6 +14,8 @@ import {
   GEMINI_OAUTH_CREDS_PATH,
   GEMINI_CLIENT_ID,
   GEMINI_CLIENT_SECRET,
+  TIMEOUT_STREAMING,
+  TIMEOUT_NON_STREAMING,
 } from '../config';
 import { AnthropicRequest, anthropicToGemini } from '../translator/messages';
 import { StreamTranslator, SSEParser } from '../translator/streaming';
@@ -371,8 +373,8 @@ export async function handleGeminiStreaming(
     });
   });
 
-  geminiHttpReq.setTimeout(300_000, () => {
-    geminiHttpReq.destroy(new Error('Gemini streaming request timeout (300s)'));
+  geminiHttpReq.setTimeout(TIMEOUT_STREAMING, () => {
+    geminiHttpReq.destroy(new Error(`Gemini streaming request timeout (${TIMEOUT_STREAMING / 1000}s)`));
   });
 
   geminiHttpReq.on('error', (err) => {
@@ -414,6 +416,7 @@ export async function handleGeminiNonStreaming(
   try {
     accessToken = await getAccessToken();
   } catch (err: any) {
+    logError(`[GEMINI AUTH ERROR] ${err.message}`);
     sendError(clientRes, 500, 'authentication_error', err.message);
     return;
   }
@@ -486,11 +489,12 @@ export async function handleGeminiNonStreaming(
     });
   });
 
-  geminiHttpReq.setTimeout(120_000, () => {
-    geminiHttpReq.destroy(new Error('Gemini non-streaming request timeout (120s)'));
+  geminiHttpReq.setTimeout(TIMEOUT_NON_STREAMING, () => {
+    geminiHttpReq.destroy(new Error(`Gemini non-streaming request timeout (${TIMEOUT_NON_STREAMING / 1000}s)`));
   });
 
   geminiHttpReq.on('error', (err) => {
+    logError(`[GEMINI REQUEST ERROR] ${err.message}`);
     sendError(clientRes, 502, 'api_error', err.message);
   });
 

@@ -5,7 +5,7 @@
 import https from 'node:https';
 import http from 'node:http';
 import { getCachedIP, resolveAnthropicIP } from '../dns';
-import { ANTHROPIC_HOST } from '../config';
+import { ANTHROPIC_HOST, TIMEOUT_PASSTHROUGH } from '../config';
 
 let realIP: string | null = null;
 
@@ -64,8 +64,8 @@ export function forwardToAnthropic(
     proxyRes.pipe(clientRes);
   });
 
-  proxyReq.setTimeout(120_000, () => {
-    proxyReq.destroy(new Error('Upstream request timeout (120s)'));
+  proxyReq.setTimeout(TIMEOUT_PASSTHROUGH, () => {
+    proxyReq.destroy(new Error(`Upstream request timeout (${TIMEOUT_PASSTHROUGH / 1000}s)`));
   });
 
   proxyReq.on('error', (err) => {

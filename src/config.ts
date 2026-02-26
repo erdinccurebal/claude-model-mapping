@@ -20,6 +20,11 @@ export const GEMINI_CLIENT_SECRET = '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';
 
 export const HOSTS_MARKER = '# cmm-managed';
 
+// Timeouts (ms)
+export const TIMEOUT_STREAMING = 300_000;   // 5 min — streaming responses can be long
+export const TIMEOUT_NON_STREAMING = 120_000; // 2 min
+export const TIMEOUT_PASSTHROUGH = 120_000;   // 2 min
+
 export interface MappingConfig {
   sourceModel: string;
   targetModel: string;

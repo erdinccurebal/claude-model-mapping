@@ -428,6 +428,22 @@ describe('anthropicToGemini', () => {
     });
   });
 
+  it('should convert tool_choice type "none" to NONE mode', () => {
+    const req: AnthropicRequest = {
+      model: 'test',
+      max_tokens: 100,
+      messages: [{ role: 'user', content: 'Hi' }],
+      tools: [{ name: 'test', input_schema: { type: 'object' } }],
+      tool_choice: { type: 'none' },
+    };
+
+    const result = anthropicToGemini(req);
+
+    expect(result.toolConfig).toEqual({
+      functionCallingConfig: { mode: 'NONE' },
+    });
+  });
+
   it('should convert tool_choice type "auto" to AUTO mode', () => {
     const req: AnthropicRequest = {
       model: 'test',

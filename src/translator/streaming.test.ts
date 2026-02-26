@@ -208,7 +208,7 @@ describe('StreamTranslator', () => {
     expect(thinkingDelta?.data.delta.thinking).toBe('Let me think...');
   });
 
-  it('should transition from thinking to text', () => {
+  it('should transition from thinking to text with signature_delta', () => {
     const translator = new StreamTranslator('test-model');
 
     // Thinking chunk
@@ -232,15 +232,43 @@ describe('StreamTranslator', () => {
     const parsed = parseSSEEvents(events);
     const eventTypes = parsed.map((e) => e.event);
 
+    // Should emit signature_delta before closing thinking block
+    const sigDelta = parsed.find(
+      (e) => e.data?.delta?.type === 'signature_delta'
+    );
+    expect(sigDelta).toBeDefined();
+    expect(typeof sigDelta?.data.delta.signature).toBe('string');
+    expect(sigDelta?.data.delta.signature.length).toBeGreaterThan(0);
+
     // Should close thinking block and start text block
     expect(eventTypes).toContain('content_block_stop');
     expect(eventTypes).toContain('content_block_start');
-    expect(eventTypes).toContain('content_block_delta');
 
     const textDelta = parsed.find(
       (e) => e.data?.delta?.type === 'text_delta'
     );
     expect(textDelta?.data.delta.text).toBe('The answer is 42.');
+  });
+
+  it('should emit signature_delta when thinking block ends at finish', () => {
+    const translator = new StreamTranslator('test-model');
+
+    const events = translator.processChunk({
+      candidates: [
+        {
+          content: { parts: [{ text: 'Thinking...', thought: true }], role: 'model' },
+          finishReason: 'STOP',
+        },
+      ],
+      usageMetadata: { candidatesTokenCount: 10 },
+    });
+
+    const parsed = parseSSEEvents(events);
+    const sigDelta = parsed.find(
+      (e) => e.data?.delta?.type === 'signature_delta'
+    );
+    expect(sigDelta).toBeDefined();
+    expect(typeof sigDelta?.data.delta.signature).toBe('string');
   });
 
   // ─── Usage metadata ───
