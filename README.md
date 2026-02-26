@@ -1,5 +1,10 @@
 # cmm — Claude Model Mapping
 
+[![npm](https://img.shields.io/npm/v/claude-model-mapping)](https://www.npmjs.com/package/claude-model-mapping)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+**[Documentation](https://cmm.erdinc.curebal.dev)** | **[npm](https://www.npmjs.com/package/claude-model-mapping)** | **[GitHub](https://github.com/erdinccurebal/claude-model-mapping)**
+
 Transparent OS-level interception for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Redirect any Claude model to Google Gemini without modifying Claude Code itself.
 
 ```
@@ -47,6 +52,12 @@ gemini  # Follow the OAuth login flow
 ```
 
 ## Installation
+
+```bash
+npm install -g claude-model-mapping
+```
+
+Or from source:
 
 ```bash
 git clone https://github.com/erdinccurebal/claude-model-mapping.git
