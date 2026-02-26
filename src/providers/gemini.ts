@@ -16,6 +16,8 @@ import {
   GEMINI_CLIENT_SECRET,
   TIMEOUT_STREAMING,
   TIMEOUT_NON_STREAMING,
+  getUserAgent,
+  X_GOOG_API_CLIENT,
 } from '../config';
 import { AnthropicRequest, anthropicToGemini } from '../translator/messages';
 import { StreamTranslator, SSEParser } from '../translator/streaming';
@@ -29,6 +31,7 @@ interface OAuthCreds {
 
 let cachedToken: { accessToken: string; expiryDate: number } | null = null;
 let cachedProjectId: string | undefined;
+const sessionId = crypto.randomUUID();
 
 // ─── OAuth Token Management ───
 
@@ -115,7 +118,8 @@ function refreshToken(
 function codeAssistRequest(
   method: string,
   body: any,
-  accessToken: string
+  accessToken: string,
+  model?: string
 ): Promise<any> {
   return new Promise((resolve, reject) => {
     const url = `/${CODE_ASSIST_API_VERSION}:${method}`;
@@ -130,6 +134,9 @@ function codeAssistRequest(
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(bodyStr),
           Authorization: `Bearer ${accessToken}`,
+          'User-Agent': getUserAgent(model || 'unknown'),
+          'x-goog-api-client': X_GOOG_API_CLIENT,
+          Accept: 'application/json',
         },
       },
       (res) => {
@@ -236,6 +243,9 @@ function codeAssistGetOperation(name: string, accessToken: string): Promise<any>
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
+          'User-Agent': getUserAgent('unknown'),
+          'x-goog-api-client': X_GOOG_API_CLIENT,
+          Accept: 'application/json',
         },
       },
       (res) => {
@@ -254,15 +264,35 @@ function codeAssistGetOperation(name: string, accessToken: string): Promise<any>
 // ─── Rate Limit Handling ───
 
 const MAX_429_RETRIES = 3;
+const INITIAL_RETRY_DELAY_SEC = 5;
+const MAX_RETRY_DELAY_SEC = 30;
 
 /**
  * Extract wait seconds from Gemini 429 error body.
- * Looks for "Your quota will reset after Xs." pattern.
+ * Tries multiple patterns used by Google APIs.
  */
 function parseRetryAfterSeconds(errorBody: string): number {
-  const match = errorBody.match(/reset after (\d+)s/);
-  if (match) return parseInt(match[1]);
-  return 10; // default fallback
+  // "Your quota will reset after Xs."
+  const resetMatch = errorBody.match(/reset after (\d+)s/);
+  if (resetMatch) return parseInt(resetMatch[1]);
+  // "Please retry in Xs" or "Please retry in Xms"
+  const retryMatch = errorBody.match(/retry in (\d+)(ms|s)/);
+  if (retryMatch) {
+    return retryMatch[2] === 'ms'
+      ? Math.ceil(parseInt(retryMatch[1]) / 1000)
+      : parseInt(retryMatch[1]);
+  }
+  return INITIAL_RETRY_DELAY_SEC;
+}
+
+/**
+ * Calculate retry delay with exponential backoff + jitter (matches Gemini CLI strategy).
+ */
+function getRetryDelay(retryCount: number, serverHintSec: number): number {
+  const base = Math.max(serverHintSec, INITIAL_RETRY_DELAY_SEC * Math.pow(2, retryCount));
+  const capped = Math.min(base, MAX_RETRY_DELAY_SEC);
+  const jitter = capped * 0.3 * (Math.random() * 2 - 1); // ±30%
+  return Math.max(1, capped + jitter);
 }
 
 // ─── Request Handling ───
@@ -278,6 +308,7 @@ function buildCodeAssistRequest(geminiReq: any, model: string): any {
       tools: geminiReq.tools,
       toolConfig: geminiReq.toolConfig,
       generationConfig: geminiReq.generationConfig,
+      session_id: sessionId,
     },
   };
 }
@@ -321,6 +352,9 @@ export async function handleGeminiStreaming(
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(bodyStr),
       Authorization: `Bearer ${accessToken}`,
+      'User-Agent': getUserAgent(targetModel),
+      'x-goog-api-client': X_GOOG_API_CLIENT,
+      Accept: 'application/json',
     },
   };
 
@@ -341,8 +375,9 @@ export async function handleGeminiStreaming(
         }
 
         if (geminiRes.statusCode === 429 && _retryCount < MAX_429_RETRIES) {
-          const waitSec = parseRetryAfterSeconds(errorData);
-          log(`[RATE LIMITED] Waiting ${waitSec}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
+          const serverHint = parseRetryAfterSeconds(errorData);
+          const waitSec = getRetryDelay(_retryCount, serverHint);
+          log(`[RATE LIMITED] Waiting ${waitSec.toFixed(1)}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
           setTimeout(() => {
             handleGeminiStreaming(anthropicReq, targetModel, clientRes, _retryCount + 1);
           }, waitSec * 1000);
@@ -461,6 +496,9 @@ export async function handleGeminiNonStreaming(
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(bodyStr),
       Authorization: `Bearer ${accessToken}`,
+      'User-Agent': getUserAgent(targetModel),
+      'x-goog-api-client': X_GOOG_API_CLIENT,
+      Accept: 'application/json',
     },
   };
 
@@ -487,8 +525,9 @@ export async function handleGeminiNonStreaming(
       }
 
       if (geminiRes.statusCode === 429 && _retryCount < MAX_429_RETRIES) {
-        const waitSec = parseRetryAfterSeconds(data);
-        log(`[RATE LIMITED] Waiting ${waitSec}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
+        const serverHint = parseRetryAfterSeconds(data);
+        const waitSec = getRetryDelay(_retryCount, serverHint);
+        log(`[RATE LIMITED] Waiting ${waitSec.toFixed(1)}s before retry (${_retryCount + 1}/${MAX_429_RETRIES})...`);
         setTimeout(() => {
           handleGeminiNonStreaming(anthropicReq, targetModel, clientRes, _retryCount + 1);
         }, waitSec * 1000);
