@@ -1,0 +1,54 @@
+{
+  "name": "claude-model-mapping",
+  "version": "1.0.0",
+  "description": "Transparent OS-level model interception for Claude Code — redirect any model to Gemini",
+  "main": "dist/index.js",
+  "bin": {
+    "cmm": "./bin/cmm"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "claude",
+    "gemini",
+    "model-mapping",
+    "proxy",
+    "interceptor",
+    "claude-code",
+    "llm"
+  ],
+  "author": "Erdinc Curebal",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/erdinccurebal/claude-model-mapping.git"
+  },
+  "bugs": {
+    "url": "https://github.com/erdinccurebal/claude-model-mapping/issues"
+  },
+  "homepage": "https://github.com/erdinccurebal/claude-model-mapping#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "os": [
+    "darwin"
+  ],
+  "files": [
+    "dist/",
+    "bin/",
+    "LICENSE",
+    "README.md"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}
