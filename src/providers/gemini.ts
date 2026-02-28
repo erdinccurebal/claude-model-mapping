@@ -14,11 +14,6 @@ const PROXY_HOST = 'localhost';
 const PROXY_PORT = 8317;
 const API_KEY = 'sk-iuKiKWCkUlahcoE6X';
 
-export async function initCodeAssist(): Promise<string | undefined> {
-  log('CLIProxyAPI provider initialized');
-  return undefined;
-}
-
 export async function handleGeminiStreaming(
   anthropicReq: AnthropicRequest,
   targetModel: string,

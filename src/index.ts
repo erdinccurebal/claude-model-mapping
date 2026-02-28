@@ -11,7 +11,6 @@ import {
 import { generateCerts, trustCA, setupNodeCA, certsExist, removeKeychain, removeNodeCA } from './certs';
 import { addHostsEntry, removeHostsEntry, isHostsHijacked, resolveAnthropicIP } from './dns';
 import { initAnthropicIP } from './providers/anthropic';
-import { initCodeAssist } from './providers/gemini';
 import { startServer } from './server';
 import { runE2ETest } from './e2e-test';
 
@@ -114,9 +113,6 @@ program
       const realIP = await initAnthropicIP();
       console.log(`📡 Real IP: ${realIP}`);
 
-      console.log('🤖 Connecting to Gemini Code Assist...');
-      await initCodeAssist();
-
       addHostsEntry();
 
       let server: https.Server;
@@ -180,10 +176,6 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   console.log(`\n📡 Resolving ${ANTHROPIC_HOST}...`);
   const realIP = await initAnthropicIP();
   console.log(`   → Real IP: ${realIP} (cached)`);
-
-  // Initialize Gemini Code Assist
-  console.log(`\n🤖 Connecting to Gemini Code Assist...`);
-  await initCodeAssist();
 
   // Hijack DNS
   console.log(`\n📝 Updating /etc/hosts...`);

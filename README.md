@@ -33,7 +33,7 @@ Claude Code (unmodified)
 1. `/etc/hosts` redirects `api.anthropic.com` to `127.0.0.1`
 2. cmm runs a local HTTPS server on port 443 with a trusted self-signed certificate
 3. Incoming requests are routed by model name:
-   - **Matched model** → translated to Gemini format, sent to Google Code Assist API, response translated back to Anthropic format
+   - **Matched model** → translated to Gemini format, sent to CLIProxyAPI on localhost:8317, response translated back to Anthropic format
    - **Other models** → forwarded to real Anthropic API using cached IP
 
 Claude Code sees normal Anthropic API responses. No env vars, no config changes, no patches.
