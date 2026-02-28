@@ -12,6 +12,12 @@ export const PID_FILE_PATH = path.join(CMM_DIR, 'cmm.pid');
 export const ANTHROPIC_HOST = 'api.anthropic.com';
 export const HOSTS_MARKER = '# cmm-managed';
 
+// CLIProxyAPI
+export const PROXY_HOST = 'localhost';
+export const PROXY_PORT = 8317;
+export const PROXY_PATH = '/v1/messages';
+export const PROXY_API_KEY = 'sk-iuKiKWCkUlahcoE6X';
+
 // Timeouts (ms)
 export const TIMEOUT_STREAMING = 300_000;   // 5 min — streaming responses can be long
 export const TIMEOUT_NON_STREAMING = 120_000; // 2 min

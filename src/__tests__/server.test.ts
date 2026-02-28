@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { startServer } from './server';
-import type { MappingConfig } from './config';
+import { startServer } from '../server';
+import type { MappingConfig } from '../config';
 
 describe('Server', () => {
   it('should accept a valid mapping config', async () => {

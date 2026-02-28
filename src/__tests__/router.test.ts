@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable, Writable } from 'node:stream';
-import { createRouter } from './router';
+import { createRouter } from '../router';
 
 // Mock the providers
-vi.mock('./providers/anthropic', () => ({
+vi.mock('../providers/anthropic', () => ({
   forwardToAnthropic: vi.fn(),
 }));
 
-vi.mock('./providers/gemini', () => ({
-  handleGeminiStreaming: vi.fn(),
-  handleGeminiNonStreaming: vi.fn(),
+vi.mock('../providers/proxy', () => ({
+  handleProxyStreaming: vi.fn(),
+  handleProxyNonStreaming: vi.fn(),
 }));
 
-import { forwardToAnthropic } from './providers/anthropic';
-import { handleGeminiStreaming, handleGeminiNonStreaming } from './providers/gemini';
+import { forwardToAnthropic } from '../providers/anthropic';
+import { handleProxyStreaming, handleProxyNonStreaming } from '../providers/proxy';
 
 function createMockReq(method: string, url: string, body: any): IncomingMessage {
   const bodyStr = JSON.stringify(body);
@@ -70,7 +70,7 @@ describe('createRouter', () => {
     // Wait for body to be read
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(handleGeminiStreaming).toHaveBeenCalledWith(
+    expect(handleProxyStreaming).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'claude-haiku-4-5-20251001', stream: true }),
       'gemini-2.5-flash',
       res
@@ -96,7 +96,7 @@ describe('createRouter', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(handleGeminiNonStreaming).toHaveBeenCalled();
+    expect(handleProxyNonStreaming).toHaveBeenCalled();
     expect(forwardToAnthropic).not.toHaveBeenCalled();
   });
 
@@ -118,8 +118,8 @@ describe('createRouter', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(forwardToAnthropic).toHaveBeenCalled();
-    expect(handleGeminiStreaming).not.toHaveBeenCalled();
-    expect(handleGeminiNonStreaming).not.toHaveBeenCalled();
+    expect(handleProxyStreaming).not.toHaveBeenCalled();
+    expect(handleProxyNonStreaming).not.toHaveBeenCalled();
   });
 
   it('should intercept when URL has query params like ?beta=true', async () => {
@@ -140,7 +140,7 @@ describe('createRouter', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(handleGeminiStreaming).toHaveBeenCalled();
+    expect(handleProxyStreaming).toHaveBeenCalled();
     expect(forwardToAnthropic).not.toHaveBeenCalled();
   });
 
@@ -201,7 +201,7 @@ describe('createRouter', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(handleGeminiStreaming).toHaveBeenCalled();
+    expect(handleProxyStreaming).toHaveBeenCalled();
   });
 
   it('should not match partial non-prefix model names', async () => {
@@ -223,6 +223,6 @@ describe('createRouter', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(forwardToAnthropic).toHaveBeenCalled();
-    expect(handleGeminiStreaming).not.toHaveBeenCalled();
+    expect(handleProxyStreaming).not.toHaveBeenCalled();
   });
 });

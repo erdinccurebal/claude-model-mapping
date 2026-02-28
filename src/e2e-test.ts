@@ -2,8 +2,8 @@
  * End-to-end integration test for cmm
  * Usage: sudo cmm test
  *
- * 1. Starts the interceptor (haiku → gemini)
- * 2. Sends a haiku request → expects INTERCEPTED (x-cmm-provider: gemini)
+ * 1. Starts the interceptor (haiku → CLIProxyAPI)
+ * 2. Sends a haiku request → expects INTERCEPTED (x-cmm-provider: cliproxyapi)
  * 3. Sends an opus request → expects PASSTHROUGH (no x-cmm-provider)
  * 4. Cleans up
  */
@@ -85,11 +85,11 @@ export async function runE2ETest(): Promise<boolean> {
   console.log('\n🧪 cmm E2E Test\n');
 
   // Test 1: haiku model → should be INTERCEPTED
-  console.log('  [1/2] haiku → Gemini (expecting INTERCEPTED)...');
+  console.log('  [1/2] haiku → CLIProxyAPI (expecting INTERCEPTED)...');
   try {
     const res = await makeRequest('claude-haiku-4-5-20251001', caCert);
     const provider = res.headers['x-cmm-provider'];
-    if (provider === 'gemini') {
+    if (provider === 'cliproxyapi') {
       results.push({
         name: 'haiku → INTERCEPTED',
         pass: true,

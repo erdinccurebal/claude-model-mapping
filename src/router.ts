@@ -1,13 +1,13 @@
 /**
  * Model-based request router
- * Routes intercepted models to Gemini, everything else to real Anthropic
+ * Routes intercepted models to CLIProxyAPI, everything else to real Anthropic
  */
 
 import http from 'node:http';
 import { MappingConfig } from './config';
 import { forwardToAnthropic } from './providers/anthropic';
-import { handleGeminiStreaming, handleGeminiNonStreaming } from './providers/gemini';
-import { AnthropicRequest } from './translator/messages';
+import { handleProxyStreaming, handleProxyNonStreaming } from './providers/proxy';
+import { AnthropicRequest } from './types';
 import { log } from './logger';
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -46,11 +46,14 @@ export function createRouter(mapping: MappingConfig) {
 
           // Check if model matches the source pattern (prefix match)
           if (model.startsWith(mapping.sourceModel)) {
-            log(`${model.padEnd(35)} → INTERCEPTED → ${mapping.targetModel} ✓`);
+            const sizeKB = (rawBody.length / 1024).toFixed(1);
+            const msgCount = body.messages?.length || 0;
+            const toolCount = body.tools?.length || 0;
+            log(`${model.padEnd(35)} → INTERCEPTED → ${mapping.targetModel} (${sizeKB}KB, ${msgCount}msg, ${toolCount}tools) ✓`);
             if (body.stream) {
-              handleGeminiStreaming(body, mapping.targetModel, res);
+              handleProxyStreaming(body, mapping.targetModel, res);
             } else {
-              handleGeminiNonStreaming(body, mapping.targetModel, res);
+              handleProxyNonStreaming(body, mapping.targetModel, res);
             }
             return;
           }

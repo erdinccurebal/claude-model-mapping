@@ -5,13 +5,13 @@
 
 **[Documentation](https://cmm.erdinc.curebal.dev)** | **[npm](https://www.npmjs.com/package/claude-model-mapping)** | **[GitHub](https://github.com/erdinccurebal/claude-model-mapping)**
 
-Transparent OS-level interception for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Redirect any Claude model to Google Gemini without modifying Claude Code itself.
+Transparent OS-level interception for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Redirect any Claude model to CLIProxyAPI without modifying Claude Code itself.
 
 ```
 sudo cmm claude-haiku-4-5 gemini-2.5-flash
 ```
 
-That's it. Open Claude Code normally — haiku requests go to Gemini, everything else passes through untouched.
+That's it. Open Claude Code normally — haiku requests go to CLIProxyAPI, everything else passes through untouched.
 
 ## How It Works
 
@@ -24,8 +24,8 @@ Claude Code (unmodified)
 ┌──────────────────────────────────┐
 │  cmm — Local HTTPS Server (:443) │
 │                                  │
-│  model = haiku?                  │
-│    YES → Gemini API              │
+│  model matches source?           │
+│    YES → CLIProxyAPI (:8317)     │
 │    NO  → Real api.anthropic.com  │
 └──────────────────────────────────┘
 ```
@@ -33,7 +33,7 @@ Claude Code (unmodified)
 1. `/etc/hosts` redirects `api.anthropic.com` to `127.0.0.1`
 2. cmm runs a local HTTPS server on port 443 with a trusted self-signed certificate
 3. Incoming requests are routed by model name:
-   - **Matched model** → translated to Gemini format, sent to CLIProxyAPI on localhost:8317, response translated back to Anthropic format
+   - **Matched model** → forwarded to CLIProxyAPI on localhost:8317
    - **Other models** → forwarded to real Anthropic API using cached IP
 
 Claude Code sees normal Anthropic API responses. No env vars, no config changes, no patches.
@@ -43,13 +43,7 @@ Claude Code sees normal Anthropic API responses. No env vars, no config changes,
 - **macOS** (uses Keychain for certificate trust)
 - **Node.js 18+**
 - **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** installed and logged in
-- **[Gemini CLI](https://github.com/google-gemini/gemini-cli)** installed and logged in (for OAuth credentials)
-
-```bash
-# Install Gemini CLI and log in
-npm install -g @google/gemini-cli
-gemini  # Follow the OAuth login flow
-```
+- **CLIProxyAPI** running on localhost:8317
 
 ## Installation
 
@@ -138,14 +132,14 @@ Removes certificates, Keychain entry, `NODE_EXTRA_CA_CERTS` from `.zshrc`, and t
 
 | Request model | Behavior | Destination |
 |---|---|---|
-| Matches `<source-model>*` | **INTERCEPTED** | Gemini API (target model) |
+| Matches `<source-model>*` | **INTERCEPTED** | CLIProxyAPI (target model) |
 | Everything else | **PASSTHROUGH** | Real api.anthropic.com |
 
 Non-messages endpoints (`/v1/models`, `/api/oauth/*`, etc.) always pass through.
 
 ### Verifying interception
 
-Intercepted responses include an `x-cmm-provider: gemini` header. You can check it in logs or with `curl`:
+Intercepted responses include an `x-cmm-provider: cliproxyapi` header. You can check it in logs or with `curl`:
 
 ```bash
 curl -s -D- https://api.anthropic.com/v1/messages \
@@ -162,49 +156,30 @@ curl -s -D- https://api.anthropic.com/v1/messages \
 Live logs appear in the terminal:
 
 ```
-[18:01:32] claude-opus-4-6              → PASSTHROUGH ✓
-[18:01:45] claude-haiku-4-5-20251001    → INTERCEPTED → gemini-2.5-flash ✓
-[18:02:01] GET /v1/models               → PASSTHROUGH
+[2026-02-28 18:01:32] claude-opus-4-6              → PASSTHROUGH ✓
+[2026-02-28 18:01:45] claude-haiku-4-5-20251001    → INTERCEPTED → gemini-2.5-flash ✓
+[2026-02-28 18:02:01] GET /v1/models               → PASSTHROUGH
 ```
 
-Logs are also written to `~/.cmm/cmm.log` (1 MB max, auto-rotated).
+Logs are also written to `~/.cmm/cmm.log` (1 MB max, auto-rotated with 3 backups).
 
 ## Architecture
 
 ```
 src/
 ├── index.ts              # CLI entry point (setup/stop/status/test)
-├── config.ts             # Paths and constants
+├── config.ts             # Paths, constants, and proxy settings
+├── types.ts              # Anthropic API type definitions
 ├── certs.ts              # Certificate generation + Keychain management
 ├── dns.ts                # /etc/hosts manipulation
 ├── server.ts             # HTTPS server on port 443
 ├── router.ts             # Model-based request routing
 ├── logger.ts             # File + console logging with rotation
 ├── e2e-test.ts           # End-to-end integration test
-├── providers/
-│   ├── anthropic.ts      # Passthrough to real Anthropic API
-│   └── gemini.ts         # Gemini Code Assist API + OAuth token management
-└── translator/
-    ├── messages.ts       # Anthropic ↔ Gemini message format conversion
-    ├── streaming.ts      # Gemini SSE → Anthropic SSE streaming translation
-    └── tools.ts          # Tool use ID generation + format helpers
+└── providers/
+    ├── anthropic.ts      # Passthrough to real Anthropic API
+    └── proxy.ts          # CLIProxyAPI handler (streaming + non-streaming)
 ```
-
-### Translation layer
-
-cmm translates between Anthropic Messages API and Gemini API formats in real-time:
-
-- **Messages**: `messages[]` ↔ `contents[]` with role mapping
-- **System prompts**: `system` ↔ `systemInstruction`
-- **Tool use**: `tool_use`/`tool_result` ↔ `functionCall`/`functionResponse`
-- **Streaming**: Gemini SSE chunks → Anthropic SSE events (`message_start`, `content_block_delta`, `message_stop`, etc.)
-- **Thinking**: `thinking` blocks with `signature` field
-- **Images**: Base64 `image` blocks ↔ `inlineData`
-- **Schemas**: JSON Schema cleaning (whitelist approach for Gemini compatibility)
-
-### Authentication
-
-cmm uses Gemini CLI's existing OAuth credentials (`~/.gemini/oauth_creds.json`) — no separate API key needed. Tokens are automatically refreshed when expired.
 
 ## Runtime files
 
@@ -215,7 +190,7 @@ cmm uses Gemini CLI's existing OAuth credentials (`~/.gemini/oauth_creds.json`) 
 ├── server.key       # Server private key (chmod 600)
 ├── server.crt       # Server certificate (signed by CA)
 ├── cmm.pid          # PID file for running instance
-├── cmm.log          # Request log (1 MB max)
+├── cmm.log          # Request log (1 MB max, 3 backups)
 └── anthropic-ip.cache  # Cached real IP of api.anthropic.com
 ```
 
@@ -225,7 +200,6 @@ cmm uses Gemini CLI's existing OAuth credentials (`~/.gemini/oauth_creds.json`) 
 - `/etc/hosts` modification and port 443 binding require `sudo`
 - `cmm stop` or `Ctrl+C` always restores `/etc/hosts` (SIGINT/SIGTERM handlers)
 - Certificates are scoped to `api.anthropic.com` only
-- OAuth client credentials are the same public values used by [Gemini CLI](https://github.com/google-gemini/gemini-cli) (open source)
 
 ## Troubleshooting
 
@@ -253,13 +227,9 @@ Another cmm instance is running. Stop it first:
 sudo cmm stop
 ```
 
-### Gemini returns 401
+### CLIProxyAPI connection refused
 
-OAuth token expired. cmm auto-retries once. If it persists, re-login to Gemini CLI:
-
-```bash
-gemini  # Re-authenticate
-```
+Make sure CLIProxyAPI is running on localhost:8317.
 
 ### Claude Code not connecting
 

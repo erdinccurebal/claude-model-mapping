@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getCachedIP, isHostsHijacked } from './dns';
+import { getCachedIP, isHostsHijacked } from '../dns';
 
 describe('DNS utilities', () => {
   it('should return null for uncached IP initially', () => {

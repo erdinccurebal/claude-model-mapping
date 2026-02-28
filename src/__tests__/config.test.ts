@@ -12,7 +12,7 @@ import {
   TIMEOUT_STREAMING,
   TIMEOUT_NON_STREAMING,
   TIMEOUT_PASSTHROUGH,
-} from './config';
+} from '../config';
 
 describe('Config', () => {
   it('should define all required paths', () => {
