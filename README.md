@@ -135,7 +135,7 @@ cmm config get PROXY_API_KEY
 cmm config set PROXY_API_KEY sk-abc123
 
 # Delete a value (reverts to default)
-cmm config delete PROXY_HOST
+cmm config delete PROXY_URL
 ```
 
 Available keys:
@@ -143,9 +143,7 @@ Available keys:
 | Key | Default | Description |
 |---|---|---|
 | `PROXY_API_KEY` | *(empty)* | API key for CLIProxyAPI |
-| `PROXY_HOST` | `localhost` | CLIProxyAPI host |
-| `PROXY_PORT` | `8317` | CLIProxyAPI port |
-| `PROXY_PATH` | `/v1/messages` | CLIProxyAPI endpoint path |
+| `PROXY_URL` | `http://localhost:8317/v1/messages` | CLIProxyAPI endpoint URL (supports http/https) |
 
 ### Uninstall
 

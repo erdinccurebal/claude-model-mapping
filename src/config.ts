@@ -54,12 +54,7 @@ export const ANTHROPIC_HOST = 'api.anthropic.com';
 export const HOSTS_MARKER = '# cmm-managed';
 
 // CLIProxyAPI
-export const PROXY_HOST = process.env.PROXY_HOST || 'localhost';
-export const PROXY_PORT = (() => {
-  const p = parseInt(process.env.PROXY_PORT || '8317', 10);
-  return isNaN(p) ? 8317 : p;
-})();
-export const PROXY_PATH = process.env.PROXY_PATH || '/v1/messages';
+export const PROXY_URL = process.env.PROXY_URL || 'http://localhost:8317/v1/messages';
 export const PROXY_API_KEY = process.env.PROXY_API_KEY || '';
 
 // Timeouts (ms)
@@ -76,14 +71,12 @@ export interface MappingConfig {
 
 export const ENV_PATH = path.join(CMM_DIR, '.env');
 
-export const VALID_CONFIG_KEYS = ['PROXY_API_KEY', 'PROXY_HOST', 'PROXY_PORT', 'PROXY_PATH'] as const;
+export const VALID_CONFIG_KEYS = ['PROXY_API_KEY', 'PROXY_URL'] as const;
 export type ConfigKey = (typeof VALID_CONFIG_KEYS)[number];
 
 export const CONFIG_DEFAULTS: Record<ConfigKey, string> = {
   PROXY_API_KEY: '',
-  PROXY_HOST: 'localhost',
-  PROXY_PORT: '8317',
-  PROXY_PATH: '/v1/messages',
+  PROXY_URL: 'http://localhost:8317/v1/messages',
 };
 
 export function readEnvFile(): Record<string, string> {

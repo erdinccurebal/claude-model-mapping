@@ -4,7 +4,8 @@
  */
 
 import http from 'node:http';
-import { PROXY_HOST, PROXY_PORT, PROXY_PATH, PROXY_API_KEY, TIMEOUT_STREAMING, TIMEOUT_NON_STREAMING } from '../config';
+import https from 'node:https';
+import { PROXY_URL, PROXY_API_KEY, TIMEOUT_STREAMING, TIMEOUT_NON_STREAMING } from '../config';
 import { log, logError } from '../logger';
 import { AnthropicRequest } from '../types';
 
@@ -12,6 +13,10 @@ const MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 10_000; // 10s fallback
 const MAX_ERROR_BODY = 8 * 1024; // 8KB cap on error body buffering
 const MAX_RESPONSE_BODY = 10 * 1024 * 1024; // 10MB cap on non-streaming response
+
+const proxyUrl = new URL(PROXY_URL);
+const isHttps = proxyUrl.protocol === 'https:';
+const httpModule = isHttps ? https : http;
 
 /**
  * Parse retry delay from 429 error body
@@ -40,9 +45,9 @@ function doRequest(
 ): Promise<{ statusCode: number; headers: http.IncomingHttpHeaders; data: string }> {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: PROXY_HOST,
-      port: PROXY_PORT,
-      path: PROXY_PATH,
+      hostname: proxyUrl.hostname,
+      port: proxyUrl.port,
+      path: proxyUrl.pathname,
       method: 'POST',
       timeout,
       headers: {
@@ -52,7 +57,7 @@ function doRequest(
       },
     };
 
-    const req = http.request(options, (res) => {
+    const req = httpModule.request(options, (res) => {
       let data = '';
       let dataLen = 0;
       res.on('data', (chunk) => {
@@ -87,9 +92,9 @@ function doStreamingRequest(
   onError: (err: Error) => void
 ): http.ClientRequest {
   const options = {
-    hostname: PROXY_HOST,
-    port: PROXY_PORT,
-    path: PROXY_PATH,
+    hostname: proxyUrl.hostname,
+    port: proxyUrl.port,
+    path: proxyUrl.pathname,
     method: 'POST',
     timeout,
     headers: {
@@ -99,7 +104,7 @@ function doStreamingRequest(
     },
   };
 
-  const req = http.request(options, onResponse);
+  const req = httpModule.request(options, onResponse);
   req.on('error', onError);
   req.on('timeout', () => req.destroy(new Error(`Request timeout after ${timeout}ms`)));
   req.write(body);
