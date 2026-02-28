@@ -173,7 +173,11 @@ export async function handleProxyStreaming(
 
           if (proxyRes.statusCode !== 200) {
             let errorData = '';
-            proxyRes.on('data', (chunk) => (errorData += chunk));
+            let errorDataLen = 0;
+            proxyRes.on('data', (chunk) => {
+              errorDataLen += chunk.length;
+              if (errorDataLen <= MAX_ERROR_BODY) errorData += chunk;
+            });
             proxyRes.on('end', () => {
               logError(`[PROXY ${proxyRes.statusCode}] ${errorData.substring(0, 200)}`);
               sendError(clientRes, proxyRes.statusCode || 502, 'api_error', errorData.substring(0, 200));

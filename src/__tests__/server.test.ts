@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { startServer } from '../server';
+import { describe, it, expect } from 'vitest';
 import type { MappingConfig } from '../config';
 
 describe('Server', () => {

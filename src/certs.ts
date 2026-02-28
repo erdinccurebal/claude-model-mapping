@@ -97,7 +97,7 @@ export function generateCerts(): void {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`\n❌ Certificate generation failed: ${msg}`);
-    process.exit(1);
+    throw err;
   } finally {
     // Always clean up temp files, even on error
     for (const f of tempFiles) {

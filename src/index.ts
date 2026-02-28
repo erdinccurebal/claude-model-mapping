@@ -24,7 +24,7 @@ const program = new Command();
 program
   .name('cmm')
   .description('Claude Model Mapping — Transparent OS-level model interception')
-  .version('1.2.0');
+  .version('1.2.1');
 
 // ──── cmm setup ────
 program
