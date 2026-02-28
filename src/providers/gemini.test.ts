@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
 // We test the pure functions that don't require network access.
-// The convertGeminiToAnthropicResponse and buildCodeAssistRequest are not exported,
-// so we test them indirectly through the streaming translator and message converter.
 
 // Import what we can test directly
 import { anthropicToGemini } from '../translator/messages';

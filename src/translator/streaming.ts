@@ -11,6 +11,7 @@ interface GeminiStreamChunk {
       parts?: Array<{
         text?: string;
         thought?: boolean;
+        thoughtSignature?: string;
         functionCall?: { name: string; args: any };
       }>;
       role?: string;
@@ -37,6 +38,7 @@ export class StreamTranslator {
   private hasFunctionCall = false;
   private inputTokens = 0;
   private outputTokens = 0;
+  private lastThoughtSignature: string | null = null;
 
   constructor(fakeModel: string) {
     this.messageId = generateMessageId();
@@ -85,6 +87,16 @@ export class StreamTranslator {
 
     for (const candidate of chunk.candidates || []) {
       for (const part of candidate.content?.parts || []) {
+        // Capture standalone thoughtSignature parts from Gemini
+        if (part.thoughtSignature && !part.text && !part.functionCall) {
+          this.lastThoughtSignature = part.thoughtSignature;
+          continue;
+        }
+        // Also capture thoughtSignature if it's alongside other fields
+        if (part.thoughtSignature) {
+          this.lastThoughtSignature = part.thoughtSignature;
+        }
+
         if (part.functionCall) {
           // Close any active block first
           if (this.activeBlockType !== null) {
@@ -227,7 +239,9 @@ export class StreamTranslator {
   }
 
   private emitSignatureDelta(): string[] {
-    const sig = crypto.randomBytes(64).toString('base64');
+    // Use Gemini's actual thoughtSignature if available, otherwise generate a random one
+    const sig = this.lastThoughtSignature || crypto.randomBytes(64).toString('base64');
+    this.lastThoughtSignature = null;
     return [
       this.sseEvent('content_block_delta', {
         type: 'content_block_delta',

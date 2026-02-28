@@ -5,7 +5,6 @@ import {
   CMM_DIR,
   PID_FILE_PATH,
   ANTHROPIC_HOST,
-  GEMINI_OAUTH_CREDS_PATH,
   CA_CERT_PATH,
   MappingConfig,
 } from './config';
@@ -109,10 +108,6 @@ program
         console.error('❌ Certificates not found. Run "cmm setup" first.');
         process.exit(1);
       }
-      if (!fs.existsSync(GEMINI_OAUTH_CREDS_PATH)) {
-        console.error('❌ Gemini OAuth credentials not found.');
-        process.exit(1);
-      }
 
       const mapping = { sourceModel: 'claude-haiku-4-5', targetModel: 'gemini-3.1-pro-preview' };
 
@@ -170,12 +165,6 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   // Check prerequisites
   if (!certsExist()) {
     console.error('❌ Certificates not found. Run "cmm setup" first.');
-    process.exit(1);
-  }
-
-  if (!fs.existsSync(GEMINI_OAUTH_CREDS_PATH)) {
-    console.error('❌ Gemini OAuth credentials not found.');
-    console.error('   Install and log in to Gemini CLI: npm install -g @google/gemini-cli && gemini');
     process.exit(1);
   }
 
@@ -267,11 +256,5 @@ function checkPrerequisites(): void {
   if (major < 18) {
     console.error(`❌ Node.js v18+ required. Current: ${nodeVersion}`);
     process.exit(1);
-  }
-
-  // Check Gemini CLI credentials
-  if (!fs.existsSync(GEMINI_OAUTH_CREDS_PATH)) {
-    console.warn('⚠ Gemini CLI credentials not found (~/.gemini/oauth_creds.json)');
-    console.warn('   Install and log in to Gemini CLI: npm install -g @google/gemini-cli && gemini');
   }
 }
