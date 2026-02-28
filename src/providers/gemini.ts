@@ -1,14 +1,11 @@
 /**
  * Gemini provider via CLIProxyAPI
- * Delegates all requests to http://localhost:8317
+ * Delegates all requests to http://localhost:8317 (OpenAI-compatible)
  */
 
 import http from 'node:http';
-import https from 'node:https';
-import { log, logError } from '../logger';
-import { AnthropicRequest, anthropicToGemini } from '../translator/messages';
-import { StreamTranslator, SSEParser } from '../translator/streaming';
-import { generateMessageId } from '../translator/tools';
+import { logError } from '../logger';
+import { AnthropicRequest } from '../translator/messages';
 
 const PROXY_HOST = 'localhost';
 const PROXY_PORT = 8317;
@@ -20,7 +17,13 @@ export async function handleGeminiStreaming(
   clientRes: http.ServerResponse
 ): Promise<void> {
   try {
-    const geminiReq = anthropicToGemini(anthropicReq);
+    // CLIProxyAPI expects OpenAI format with model override
+    const proxyBody = {
+      ...anthropicReq,
+      model: targetModel,
+    };
+
+    const bodyStr = JSON.stringify(proxyBody);
 
     const proxyReq = http.request(
       {
@@ -30,8 +33,8 @@ export async function handleGeminiStreaming(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bodyStr),
           Authorization: `Bearer ${API_KEY}`,
-          'X-Model': targetModel,
         },
       },
       (proxyRes) => {
@@ -52,31 +55,17 @@ export async function handleGeminiStreaming(
           'x-cmm-provider': 'cliproxyapi',
         });
 
-        const translator = new StreamTranslator(anthropicReq.model);
-        const sseParser = new SSEParser();
-
         proxyRes.setEncoding('utf-8');
         proxyRes.on('data', (chunk: string) => {
-          if (!clientRes.writable) return;
-          const events = sseParser.feed(chunk);
-          for (const event of events) {
-            const anthropicEvents = translator.processChunk(event);
-            for (const anthropicEvent of anthropicEvents) {
-              clientRes.write(anthropicEvent);
-            }
+          if (clientRes.writable) {
+            clientRes.write(chunk);
           }
         });
 
         proxyRes.on('end', () => {
-          if (!clientRes.writable) return;
-          const remaining = sseParser.flush();
-          for (const event of remaining) {
-            const anthropicEvents = translator.processChunk(event);
-            for (const anthropicEvent of anthropicEvents) {
-              clientRes.write(anthropicEvent);
-            }
+          if (clientRes.writable) {
+            clientRes.end();
           }
-          clientRes.end();
         });
 
         proxyRes.on('error', (err: any) => {
@@ -91,7 +80,7 @@ export async function handleGeminiStreaming(
       sendError(clientRes, 502, 'api_error', err.message);
     });
 
-    proxyReq.write(JSON.stringify(geminiReq));
+    proxyReq.write(bodyStr);
     proxyReq.end();
   } catch (err: any) {
     logError(`[STREAMING ERROR] ${err.message}`);
@@ -105,7 +94,13 @@ export async function handleGeminiNonStreaming(
   clientRes: http.ServerResponse
 ): Promise<void> {
   try {
-    const geminiReq = anthropicToGemini(anthropicReq);
+    // CLIProxyAPI expects OpenAI format with model override
+    const proxyBody = {
+      ...anthropicReq,
+      model: targetModel,
+    };
+
+    const bodyStr = JSON.stringify(proxyBody);
 
     const proxyReq = http.request(
       {
@@ -115,8 +110,8 @@ export async function handleGeminiNonStreaming(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(bodyStr),
           Authorization: `Bearer ${API_KEY}`,
-          'X-Model': targetModel,
         },
       },
       (proxyRes) => {
@@ -130,14 +125,13 @@ export async function handleGeminiNonStreaming(
               return;
             }
 
-            const geminiResponse = JSON.parse(data);
-            const anthropicResponse = convertGeminiToAnthropicResponse(geminiResponse, anthropicReq.model);
+            const response = JSON.parse(data);
 
             clientRes.writeHead(200, {
               'content-type': 'application/json',
               'x-cmm-provider': 'cliproxyapi',
             });
-            clientRes.end(JSON.stringify(anthropicResponse));
+            clientRes.end(JSON.stringify(response));
           } catch (err: any) {
             logError(`[PARSE ERROR] ${err.message}`);
             sendError(clientRes, 502, 'api_error', err.message);
@@ -151,48 +145,12 @@ export async function handleGeminiNonStreaming(
       sendError(clientRes, 502, 'api_error', err.message);
     });
 
-    proxyReq.write(JSON.stringify(geminiReq));
+    proxyReq.write(bodyStr);
     proxyReq.end();
   } catch (err: any) {
     logError(`[NON-STREAMING ERROR] ${err.message}`);
     sendError(clientRes, 502, 'api_error', err.message);
   }
-}
-
-function convertGeminiToAnthropicResponse(geminiRes: any, fakeModel: string): any {
-  const content: any[] = [];
-  let hasFunctionCall = false;
-  const candidate = geminiRes.candidates?.[0];
-
-  if (candidate?.content?.parts) {
-    for (const part of candidate.content.parts) {
-      if (part.functionCall) {
-        hasFunctionCall = true;
-        content.push({
-          type: 'tool_use',
-          id: 'toolu_cmm_' + Math.random().toString(36).substring(2, 15),
-          name: part.functionCall.name,
-          input: part.functionCall.args || {},
-        });
-      } else if (part.text) {
-        content.push({ type: 'text', text: part.text });
-      }
-    }
-  }
-
-  return {
-    id: generateMessageId(),
-    type: 'message',
-    role: 'assistant',
-    content: content.length > 0 ? content : [{ type: 'text', text: '' }],
-    model: fakeModel,
-    stop_reason: hasFunctionCall ? 'tool_use' : 'end_turn',
-    stop_sequence: null,
-    usage: {
-      input_tokens: geminiRes.usageMetadata?.promptTokenCount || 0,
-      output_tokens: geminiRes.usageMetadata?.candidatesTokenCount || 0,
-    },
-  };
 }
 
 function sendError(
