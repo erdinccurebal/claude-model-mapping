@@ -10,6 +10,8 @@ import { AnthropicRequest } from '../types';
 
 const MAX_RETRIES = 3;
 const DEFAULT_RETRY_DELAY = 10_000; // 10s fallback
+const MAX_ERROR_BODY = 8 * 1024; // 8KB cap on error body buffering
+const MAX_RESPONSE_BODY = 10 * 1024 * 1024; // 10MB cap on non-streaming response
 
 /**
  * Parse retry delay from 429 error body
@@ -52,7 +54,15 @@ function doRequest(
 
     const req = http.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => (data += chunk));
+      let dataLen = 0;
+      res.on('data', (chunk) => {
+        dataLen += chunk.length;
+        if (dataLen > MAX_RESPONSE_BODY) {
+          req.destroy(new Error(`Response body exceeds ${MAX_RESPONSE_BODY} bytes`));
+          return;
+        }
+        data += chunk;
+      });
       res.on('end', () => resolve({
         statusCode: res.statusCode || 0,
         headers: res.headers,
@@ -126,16 +136,27 @@ export async function handleProxyStreaming(
 ): Promise<void> {
   const body = JSON.stringify({ ...anthropicReq, model: targetModel });
 
+  // Track current upstream request so client disconnect aborts it.
+  // Registered once outside the loop to prevent listener accumulation on retries.
+  let activeReq: http.ClientRequest | null = null;
+  clientRes.on('close', () => {
+    if (activeReq && !activeReq.destroyed) activeReq.destroy();
+  });
+
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const result = await new Promise<'piped' | 'retry' | 'error'>((resolve) => {
-      doStreamingRequest(
+      const proxyReq = doStreamingRequest(
         body,
         TIMEOUT_STREAMING,
         (proxyRes) => {
           if (proxyRes.statusCode === 429) {
-            // Collect body to parse retry delay
+            // Collect body to parse retry delay (capped to prevent OOM)
             let errBody = '';
-            proxyRes.on('data', (chunk) => (errBody += chunk));
+            let errBodyLen = 0;
+            proxyRes.on('data', (chunk) => {
+              errBodyLen += chunk.length;
+              if (errBodyLen <= MAX_ERROR_BODY) errBody += chunk;
+            });
             proxyRes.on('end', () => {
               const delay = parseRetryDelay(errBody, proxyRes.headers['retry-after'] as string);
               const delaySec = Math.round(delay / 1000);
@@ -156,7 +177,7 @@ export async function handleProxyStreaming(
             return;
           }
 
-          // Success — pipe streaming response
+          // Success — pipe streaming response with backpressure
           clientRes.writeHead(200, {
             'content-type': 'text/event-stream',
             'cache-control': 'no-cache',
@@ -166,7 +187,12 @@ export async function handleProxyStreaming(
 
           proxyRes.setEncoding('utf-8');
           proxyRes.on('data', (chunk: string) => {
-            if (clientRes.writable) clientRes.write(chunk);
+            if (!clientRes.writable) return;
+            const canContinue = clientRes.write(chunk);
+            if (!canContinue) {
+              proxyRes.pause();
+              clientRes.once('drain', () => proxyRes.resume());
+            }
           });
           proxyRes.on('end', () => {
             if (clientRes.writable) clientRes.end();
@@ -184,6 +210,8 @@ export async function handleProxyStreaming(
           resolve('error');
         }
       );
+
+      activeReq = proxyReq;
     });
 
     if (result !== 'retry') return;
@@ -230,9 +258,10 @@ export async function handleProxyNonStreaming(
         'x-cmm-provider': 'cliproxyapi',
       });
       clientRes.end(JSON.stringify(response));
-    } catch (err: any) {
-      logError(`[PARSE ERROR] ${err.message}`);
-      sendError(clientRes, 502, 'api_error', err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logError(`[PARSE ERROR] ${msg}`);
+      sendError(clientRes, 502, 'api_error', msg);
     }
     return;
   }

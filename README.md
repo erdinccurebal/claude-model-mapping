@@ -120,6 +120,33 @@ cmm status
 sudo cmm test
 ```
 
+### Configure proxy settings
+
+Manage CLIProxyAPI connection settings stored in `~/.cmm/.env` without editing the file manually.
+
+```bash
+# List all settings
+cmm config list
+
+# Get a single value
+cmm config get PROXY_API_KEY
+
+# Set a value
+cmm config set PROXY_API_KEY sk-abc123
+
+# Delete a value (reverts to default)
+cmm config delete PROXY_HOST
+```
+
+Available keys:
+
+| Key | Default | Description |
+|---|---|---|
+| `PROXY_API_KEY` | *(empty)* | API key for CLIProxyAPI |
+| `PROXY_HOST` | `localhost` | CLIProxyAPI host |
+| `PROXY_PORT` | `8317` | CLIProxyAPI port |
+| `PROXY_PATH` | `/v1/messages` | CLIProxyAPI endpoint path |
+
 ### Uninstall
 
 ```bash
@@ -189,6 +216,7 @@ src/
 ├── ca.crt           # Root CA certificate
 ├── server.key       # Server private key (chmod 600)
 ├── server.crt       # Server certificate (signed by CA)
+├── .env             # Proxy configuration (chmod 600)
 ├── cmm.pid          # PID file for running instance
 ├── cmm.log          # Request log (1 MB max, 3 backups)
 └── anthropic-ip.cache  # Cached real IP of api.anthropic.com

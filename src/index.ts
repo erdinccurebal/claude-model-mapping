@@ -7,9 +7,14 @@ import {
   ANTHROPIC_HOST,
   CA_CERT_PATH,
   MappingConfig,
+  VALID_CONFIG_KEYS,
+  CONFIG_DEFAULTS,
+  ConfigKey,
+  readEnvFile,
+  writeEnvFile,
 } from './config';
 import { generateCerts, trustCA, setupNodeCA, certsExist, removeKeychain, removeNodeCA } from './certs';
-import { addHostsEntry, removeHostsEntry, isHostsHijacked, resolveAnthropicIP } from './dns';
+import { addHostsEntry, removeHostsEntry, isHostsHijacked } from './dns';
 import { initAnthropicIP } from './providers/anthropic';
 import { startServer } from './server';
 import { runE2ETest } from './e2e-test';
@@ -19,7 +24,7 @@ const program = new Command();
 program
   .name('cmm')
   .description('Claude Model Mapping — Transparent OS-level model interception')
-  .version('1.0.0');
+  .version('1.1.0');
 
 // ──── cmm setup ────
 program
@@ -35,7 +40,7 @@ program
 
     console.log('\n✅ Setup complete!');
     console.log('   Now open a new terminal and start using it:');
-    console.log('   sudo cmm claude-haiku-4-5 gemini-3.1-pro-preview');
+    console.log('   sudo cmm claude-haiku-4-5 gemini-2.5-flash');
   });
 
 // ──── cmm stop ────
@@ -76,6 +81,8 @@ program
     }
     console.log(`   /etc/hosts: ${hostsActive ? 'hijacked ✓' : 'clean'}`);
     console.log(`   Certificates: ${certsExist() ? 'present ✓' : 'missing'}`);
+
+    if (!running) process.exit(1);
   });
 
 // ──── cmm uninstall ────
@@ -108,7 +115,7 @@ program
         process.exit(1);
       }
 
-      const mapping = { sourceModel: 'claude-haiku-4-5', targetModel: 'gemini-3.1-pro-preview' };
+      const mapping = { sourceModel: 'claude-haiku-4-5', targetModel: 'gemini-2.5-flash' };
 
       const realIP = await initAnthropicIP();
       console.log(`📡 Real IP: ${realIP}`);
@@ -118,9 +125,10 @@ program
       let server: https.Server;
       try {
         server = await startServer(mapping);
-      } catch (err: any) {
+      } catch (err: unknown) {
         removeHostsEntry();
-        console.error(`❌ Failed to start server: ${err.message}`);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`❌ Failed to start server: ${msg}`);
         process.exit(1);
       }
 
@@ -139,10 +147,74 @@ program
     }
   });
 
+// ──── cmm config ────
+const configCmd = program
+  .command('config')
+  .description('Get/set proxy configuration in .env file');
+
+configCmd
+  .command('list')
+  .description('List all configuration values')
+  .action(() => {
+    const env = readEnvFile();
+    const maxLen = Math.max(...VALID_CONFIG_KEYS.map(k => k.length));
+    for (const key of VALID_CONFIG_KEYS) {
+      const val = env[key] ?? CONFIG_DEFAULTS[key];
+      const suffix = !(key in env) && CONFIG_DEFAULTS[key] ? ' (default)' : '';
+      console.log(`  ${key.padEnd(maxLen)} = ${val || '(empty)'}${suffix}`);
+    }
+  });
+
+configCmd
+  .command('get <key>')
+  .description('Get a configuration value')
+  .action((key: string) => {
+    if (!isValidKey(key)) return;
+    const env = readEnvFile();
+    const val = env[key] ?? CONFIG_DEFAULTS[key as ConfigKey];
+    console.log(`  ${val || '(empty)'}`);
+  });
+
+configCmd
+  .command('set <key> <value>')
+  .description('Set a configuration value')
+  .action((key: string, value: string) => {
+    if (!isValidKey(key)) return;
+    const env = readEnvFile();
+    env[key] = value;
+    writeEnvFile(env);
+    console.log(`  ✅ ${key} = ${value}`);
+  });
+
+configCmd
+  .command('delete <key>')
+  .description('Delete a configuration value (revert to default)')
+  .action((key: string) => {
+    if (!isValidKey(key)) return;
+    const env = readEnvFile();
+    if (!(key in env)) {
+      console.log(`  ⚠ ${key} is not set in .env`);
+      return;
+    }
+    delete env[key];
+    writeEnvFile(env);
+    const def = CONFIG_DEFAULTS[key as ConfigKey];
+    console.log(`  ✅ ${key} deleted${def ? ` (default: ${def})` : ''}`);
+  });
+
+function isValidKey(key: string): key is ConfigKey {
+  if (!(VALID_CONFIG_KEYS as readonly string[]).includes(key)) {
+    console.error(`  ❌ Unknown key: ${key}`);
+    console.error(`  Valid keys: ${VALID_CONFIG_KEYS.join(', ')}`);
+    return false;
+  }
+  return true;
+}
+
 // ──── cmm <source> <target> (default command) ────
 program
   .argument('[source]', 'Source model to intercept (e.g., claude-haiku-4-5)')
-  .argument('[target]', 'Target model to redirect to (e.g., gemini-3.1-pro-preview)')
+  .argument('[target]', 'Target model to redirect to (e.g., gemini-2.5-flash)')
   .action(async (source?: string, target?: string) => {
     if (!source || !target) {
       // No arguments and no subcommand — show help
@@ -185,8 +257,9 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   let server: https.Server;
   try {
     server = await startServer(mapping);
-  } catch (err: any) {
-    console.error(`\n❌ Failed to start server: ${err.message}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`\n❌ Failed to start server: ${msg}`);
     removeHostsEntry();
     process.exit(1);
   }
@@ -221,8 +294,9 @@ function cleanup(): void {
   // Remove /etc/hosts entry
   try {
     removeHostsEntry();
-  } catch (err: any) {
-    console.error(`⚠ Failed to clean /etc/hosts: ${err.message}`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`⚠ Failed to clean /etc/hosts: ${msg}`);
   }
 
   // Remove PID file

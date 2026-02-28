@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cmm — Claude Model Mapping</title>
-  <meta name="description" content="Transparent OS-level model interception for Claude Code. Redirect any Claude model to Google Gemini.">
+  <meta name="description" content="Transparent OS-level model interception for Claude Code. Redirect any Claude model via CLIProxyAPI.">
   <meta property="og:title" content="cmm — Claude Model Mapping">
-  <meta property="og:description" content="Transparent OS-level model interception for Claude Code. Redirect any Claude model to Google Gemini.">
+  <meta property="og:description" content="Transparent OS-level model interception for Claude Code. Redirect any Claude model via CLIProxyAPI.">
   <meta property="og:type" content="website">
   <style>
     :root {
@@ -352,7 +352,7 @@
       <h1><span>cmm</span> — Claude Model Mapping</h1>
       <p class="tagline">
         Transparent OS-level model interception for Claude Code.
-        Redirect any model to Google Gemini — zero config changes.
+        Redirect any model via CLIProxyAPI — zero config changes.
       </p>
       <div class="hero-code">
         <span class="prompt">$</span> sudo cmm claude-haiku-4-5 gemini-2.5-flash
@@ -384,7 +384,7 @@
 |  Trusted self-signed certificate     |
 |                                      |
 |  model = haiku?                      |
-|    <span class="green">YES -> Gemini API (target model)</span>    |
+|    <span class="green">YES -> CLIProxyAPI (target model)</span>   |
 |    <span class="orange">NO  -> Real api.anthropic.com</span>       |
 +--------------------------------------+</div>
     </div>
@@ -402,13 +402,13 @@
         </div>
         <div class="feature-card">
           <div class="icon">&#128256;</div>
-          <h3>Full Translation</h3>
-          <p>Messages, tool use, streaming, thinking blocks, images — all translated between Anthropic and Gemini formats in real-time.</p>
+          <h3>Direct Passthrough</h3>
+          <p>Anthropic-format requests forwarded directly to CLIProxyAPI. No translation layer — maximum compatibility.</p>
         </div>
         <div class="feature-card">
           <div class="icon">&#9889;</div>
           <h3>Streaming SSE</h3>
-          <p>Real-time streaming translation. Gemini SSE chunks are converted to Anthropic SSE events on the fly.</p>
+          <p>Real-time streaming with backpressure support. 429 rate-limit auto-retry with intelligent delay parsing.</p>
         </div>
         <div class="feature-card">
           <div class="icon">&#128274;</div>
@@ -417,13 +417,13 @@
         </div>
         <div class="feature-card">
           <div class="icon">&#128295;</div>
-          <h3>Tool Use</h3>
-          <p>Full bidirectional tool use translation — tool_use/tool_result mapped to functionCall/functionResponse.</p>
+          <h3>Smart Routing</h3>
+          <p>Prefix-based model matching. Intercepted models go to CLIProxyAPI, everything else passes through untouched.</p>
         </div>
         <div class="feature-card">
           <div class="icon">&#128736;</div>
-          <h3>Uses Gemini CLI Auth</h3>
-          <p>No separate API key needed. Uses your existing Gemini CLI OAuth credentials automatically.</p>
+          <h3>Easy Config</h3>
+          <p>Built-in CLI for proxy settings. <code>cmm config set PROXY_API_KEY sk-...</code> — no file editing needed.</p>
         </div>
       </div>
     </div>
@@ -438,13 +438,11 @@
         <div class="step-num">1</div>
         <div class="step-content">
           <h3>Prerequisites</h3>
-          <p>Install and log in to both CLIs:</p>
+          <p>Install Claude Code and have CLIProxyAPI running:</p>
           <pre><span class="comment"># Claude Code (installed and logged in)</span>
 <span class="cmd">claude --version</span>
 
-<span class="comment"># Gemini CLI (for OAuth credentials)</span>
-<span class="cmd">npm install -g @google/gemini-cli</span>
-<span class="cmd">gemini</span>  <span class="comment"># Follow the OAuth login flow</span></pre>
+<span class="comment"># CLIProxyAPI running on localhost:8317</span></pre>
         </div>
       </div>
 
@@ -498,7 +496,7 @@
           <tr>
             <td><code>claude-haiku-4-5*</code></td>
             <td><span class="badge badge-green">INTERCEPTED</span></td>
-            <td>Gemini API (target model)</td>
+            <td>CLIProxyAPI (target model)</td>
           </tr>
           <tr>
             <td>Everything else</td>

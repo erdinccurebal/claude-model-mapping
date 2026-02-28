@@ -1,7 +1,7 @@
 {
   "name": "claude-model-mapping",
-  "version": "1.0.0",
-  "description": "Transparent OS-level model interception for Claude Code — redirect any model to Gemini",
+  "version": "1.1.0",
+  "description": "Transparent OS-level model interception for Claude Code — redirect any model via CLIProxyAPI",
   "main": "dist/index.js",
   "bin": {
     "cmm": "./bin/cmm"
@@ -15,11 +15,11 @@
   },
   "keywords": [
     "claude",
-    "gemini",
     "model-mapping",
     "proxy",
     "interceptor",
     "claude-code",
+    "cliproxyapi",
     "llm"
   ],
   "author": "Erdinc Curebal",

@@ -117,11 +117,12 @@ export async function runE2ETest(): Promise<boolean> {
         detail: `❌ Error: ${errMsg}`,
       });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
     results.push({
       name: 'haiku → INTERCEPTED',
       pass: false,
-      detail: `❌ Connection error: ${err.message}`,
+      detail: `❌ Connection error: ${msg}`,
     });
   }
 
@@ -143,12 +144,13 @@ export async function runE2ETest(): Promise<boolean> {
         detail: `❌ Got intercepted! x-cmm-provider=${provider}`,
       });
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Connection error might mean passthrough IP is wrong, but that's still a failure
+    const msg = err instanceof Error ? err.message : String(err);
     results.push({
       name: 'opus → PASSTHROUGH',
       pass: false,
-      detail: `❌ Connection error: ${err.message}`,
+      detail: `❌ Connection error: ${msg}`,
     });
   }
 

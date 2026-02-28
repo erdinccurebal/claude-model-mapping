@@ -13,6 +13,7 @@ export async function resolveAnthropicIP(): Promise<string> {
       }
       const ip = addresses[0];
       fs.writeFileSync(IP_CACHE_PATH, ip);
+      fs.chmodSync(IP_CACHE_PATH, 0o600);
       resolve(ip);
     });
   });

@@ -9,8 +9,8 @@ vi.mock('../providers/anthropic', () => ({
 }));
 
 vi.mock('../providers/proxy', () => ({
-  handleProxyStreaming: vi.fn(),
-  handleProxyNonStreaming: vi.fn(),
+  handleProxyStreaming: vi.fn().mockResolvedValue(undefined),
+  handleProxyNonStreaming: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { forwardToAnthropic } from '../providers/anthropic';

@@ -14,12 +14,12 @@ export interface AnthropicContentBlock {
   signature?: string;
   id?: string;
   name?: string;
-  input?: any;
+  input?: Record<string, unknown>;
   tool_use_id?: string;
   content?: string | AnthropicContentBlock[];
-  source?: any;
+  source?: Record<string, unknown>;
   is_error?: boolean;
-  cache_control?: any;
+  cache_control?: Record<string, unknown>;
 }
 
 export interface AnthropicRequest {
@@ -33,13 +33,13 @@ export interface AnthropicRequest {
   top_p?: number;
   top_k?: number;
   stop_sequences?: string[];
-  tool_choice?: any;
+  tool_choice?: Record<string, unknown>;
   thinking?: { type: string; budget_tokens?: number };
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 export interface AnthropicTool {
   name: string;
   description?: string;
-  input_schema: any;
+  input_schema: Record<string, unknown>;
 }
