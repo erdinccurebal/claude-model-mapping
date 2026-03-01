@@ -33,7 +33,7 @@ const program = new Command();
 program
   .name('cmm')
   .description('Claude Model Mapping — Transparent OS-level model interception')
-  .version('1.3.0')
+  .version('1.4.0')
   .option('--daemon', 'Run as launchd daemon (internal use)');
 
 // ──── cmm setup ────
