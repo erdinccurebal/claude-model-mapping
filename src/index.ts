@@ -13,6 +13,7 @@ import {
   readEnvFile,
   writeEnvFile,
 } from './config';
+
 import { generateCerts, trustCA, setupNodeCA, certsExist, removeKeychain, removeNodeCA } from './certs';
 import { addHostsEntry, removeHostsEntry, isHostsHijacked } from './dns';
 import { initAnthropicIP } from './providers/anthropic';
@@ -24,7 +25,7 @@ const program = new Command();
 program
   .name('cmm')
   .description('Claude Model Mapping — Transparent OS-level model interception')
-  .version('1.2.1');
+  .version('1.3.0');
 
 // ──── cmm setup ────
 program
@@ -217,8 +218,24 @@ program
   .argument('[target]', 'Target model to redirect to (e.g., gemini-2.5-flash)')
   .action(async (source?: string, target?: string) => {
     if (!source || !target) {
-      // No arguments and no subcommand — show help
-      program.help();
+      // Try defaults from config
+      const env = readEnvFile();
+      const defSource = source || env['DEFAULT_SOURCE_MODEL'] || '';
+      const defTarget = target || env['DEFAULT_TARGET_MODEL'] || '';
+      if (!defSource || !defTarget) {
+        if (!source && !target) {
+          console.error('❌ No models specified and no defaults configured.');
+          console.error('   Usage: sudo cmm <source-model> <target-model>');
+          console.error('   Or set defaults: cmm config set DEFAULT_SOURCE_MODEL claude-haiku-4-5');
+          console.error('                    cmm config set DEFAULT_TARGET_MODEL gemini-2.5-flash');
+        } else {
+          console.error('❌ Both source and target models are required.');
+        }
+        process.exit(1);
+        return;
+      }
+      console.log(`📋 Using defaults: ${defSource} → ${defTarget}`);
+      await startInterceptor(defSource, defTarget);
       return;
     }
 

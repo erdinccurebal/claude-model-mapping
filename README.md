@@ -78,6 +78,11 @@ Open a **new terminal** after setup.
 
 ```bash
 sudo cmm <source-model> <target-model>
+
+# Or with defaults configured:
+cmm config set DEFAULT_SOURCE_MODEL claude-haiku-4-5
+cmm config set DEFAULT_TARGET_MODEL gemini-2.5-flash
+sudo cmm
 ```
 
 Examples:
@@ -144,6 +149,8 @@ Available keys:
 |---|---|---|
 | `PROXY_API_KEY` | *(empty)* | API key for CLIProxyAPI |
 | `PROXY_URL` | `http://localhost:8317/v1/messages` | CLIProxyAPI endpoint URL (supports http/https) |
+| `DEFAULT_SOURCE_MODEL` | *(empty)* | Default source model (allows running `sudo cmm` with no args) |
+| `DEFAULT_TARGET_MODEL` | *(empty)* | Default target model |
 
 ### Uninstall
 

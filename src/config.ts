@@ -71,12 +71,14 @@ export interface MappingConfig {
 
 export const ENV_PATH = path.join(CMM_DIR, '.env');
 
-export const VALID_CONFIG_KEYS = ['PROXY_API_KEY', 'PROXY_URL'] as const;
+export const VALID_CONFIG_KEYS = ['PROXY_API_KEY', 'PROXY_URL', 'DEFAULT_SOURCE_MODEL', 'DEFAULT_TARGET_MODEL'] as const;
 export type ConfigKey = (typeof VALID_CONFIG_KEYS)[number];
 
 export const CONFIG_DEFAULTS: Record<ConfigKey, string> = {
   PROXY_API_KEY: '',
   PROXY_URL: 'http://localhost:8317/v1/messages',
+  DEFAULT_SOURCE_MODEL: '',
+  DEFAULT_TARGET_MODEL: '',
 };
 
 export function readEnvFile(): Record<string, string> {
