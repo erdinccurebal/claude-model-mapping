@@ -113,6 +113,28 @@ sudo cmm stop
 # or press Ctrl+C in the cmm terminal
 ```
 
+### Service mode (launchd)
+
+Run cmm as a background service that auto-starts on boot and auto-restarts on crash. No terminal window required.
+
+```bash
+# Install as background service
+sudo cmm service install claude-haiku-4-5 gemini-2.5-flash
+
+# Check status
+sudo cmm service status
+
+# Stop / start / restart
+sudo cmm service stop
+sudo cmm service start
+sudo cmm service restart
+
+# Remove service
+sudo cmm service uninstall
+```
+
+Service logs are written to `~/.cmm/cmm-service.log`.
+
 ### Check status
 
 ```bash
@@ -207,6 +229,7 @@ src/
 ├── server.ts             # HTTPS server on port 443
 ├── router.ts             # Model-based request routing
 ├── logger.ts             # File + console logging with rotation
+├── service.ts            # macOS launchd service management
 ├── e2e-test.ts           # End-to-end integration test
 └── providers/
     ├── anthropic.ts      # Passthrough to real Anthropic API
@@ -217,14 +240,16 @@ src/
 
 ```
 ~/.cmm/
-├── ca.key           # Root CA private key (chmod 600)
-├── ca.crt           # Root CA certificate
-├── server.key       # Server private key (chmod 600)
-├── server.crt       # Server certificate (signed by CA)
-├── .env             # Proxy configuration (chmod 600)
-├── cmm.pid          # PID file for running instance
-├── cmm.log          # Request log (1 MB max, 3 backups)
-└── anthropic-ip.cache  # Cached real IP of api.anthropic.com
+├── ca.key               # Root CA private key (chmod 600)
+├── ca.crt               # Root CA certificate
+├── server.key           # Server private key (chmod 600)
+├── server.crt           # Server certificate (signed by CA)
+├── .env                 # Proxy configuration (chmod 600)
+├── cmm.pid              # PID file for running instance
+├── cmm.log              # Request log (1 MB max, 3 backups)
+├── cmm-daemon           # Compiled wrapper binary (service mode)
+├── cmm-service.log      # Service mode log (when using launchd)
+└── anthropic-ip.cache   # Cached real IP of api.anthropic.com
 ```
 
 ## Security

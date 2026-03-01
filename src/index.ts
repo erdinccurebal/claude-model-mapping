@@ -19,13 +19,22 @@ import { addHostsEntry, removeHostsEntry, isHostsHijacked } from './dns';
 import { initAnthropicIP } from './providers/anthropic';
 import { startServer } from './server';
 import { runE2ETest } from './e2e-test';
+import {
+  serviceInstall,
+  serviceUninstall,
+  serviceStart,
+  serviceStop,
+  serviceRestart,
+  serviceStatus,
+} from './service';
 
 const program = new Command();
 
 program
   .name('cmm')
   .description('Claude Model Mapping — Transparent OS-level model interception')
-  .version('1.3.0');
+  .version('1.3.0')
+  .option('--daemon', 'Run as launchd daemon (internal use)');
 
 // ──── cmm setup ────
 program
@@ -217,6 +226,8 @@ program
   .argument('[source]', 'Source model to intercept (e.g., claude-haiku-4-5)')
   .argument('[target]', 'Target model to redirect to (e.g., gemini-2.5-flash)')
   .action(async (source?: string, target?: string) => {
+    const isDaemon = program.opts().daemon === true;
+
     if (!source || !target) {
       // Try defaults from config
       const env = readEnvFile();
@@ -234,19 +245,67 @@ program
         process.exit(1);
         return;
       }
-      console.log(`📋 Using defaults: ${defSource} → ${defTarget}`);
-      await startInterceptor(defSource, defTarget);
+      if (!isDaemon) console.log(`📋 Using defaults: ${defSource} → ${defTarget}`);
+      await startInterceptor(defSource, defTarget, isDaemon);
       return;
     }
 
-    await startInterceptor(source, target);
+    await startInterceptor(source, target, isDaemon);
   });
+
+// ──── cmm service ────
+const serviceCmd = program.command('service').description('Manage cmm as a macOS launchd service');
+
+serviceCmd
+  .command('install [source] [target]')
+  .description('Install and start cmm as a background service')
+  .action((source?: string, target?: string) => {
+    if (!source || !target) {
+      const env = readEnvFile();
+      const defSource = source || env['DEFAULT_SOURCE_MODEL'] || '';
+      const defTarget = target || env['DEFAULT_TARGET_MODEL'] || '';
+      if (!defSource || !defTarget) {
+        console.error('Missing source/target models. Provide as arguments or set defaults:');
+        console.error('  cmm config set DEFAULT_SOURCE_MODEL claude-haiku-4-5');
+        console.error('  cmm config set DEFAULT_TARGET_MODEL gemini-2.5-flash');
+        process.exit(1);
+      }
+      serviceInstall(defSource, defTarget);
+      return;
+    }
+    serviceInstall(source, target);
+  });
+
+serviceCmd
+  .command('uninstall')
+  .description('Stop and remove the cmm service')
+  .action(() => serviceUninstall());
+
+serviceCmd
+  .command('start')
+  .description('Start the cmm service')
+  .action(() => serviceStart());
+
+serviceCmd
+  .command('stop')
+  .description('Stop the cmm service')
+  .action(() => serviceStop());
+
+serviceCmd
+  .command('restart')
+  .description('Restart the cmm service')
+  .action(() => serviceRestart());
+
+serviceCmd
+  .command('status')
+  .description('Check cmm service status')
+  .action(() => serviceStatus());
 
 program.parse();
 
 // ──── Core functions ────
 
-async function startInterceptor(source: string, target: string): Promise<void> {
+async function startInterceptor(source: string, target: string, daemon = false): Promise<void> {
   // Check prerequisites
   if (!certsExist()) {
     console.error('❌ Certificates not found. Run "cmm setup" first.');
@@ -254,7 +313,7 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   }
 
   // Check NODE_EXTRA_CA_CERTS
-  if (!process.env.NODE_EXTRA_CA_CERTS) {
+  if (!daemon && !process.env.NODE_EXTRA_CA_CERTS) {
     console.warn('⚠ NODE_EXTRA_CA_CERTS is not set.');
     console.warn(`   Run "cmm setup" or: export NODE_EXTRA_CA_CERTS="${CA_CERT_PATH}"`);
   }
@@ -262,12 +321,12 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   const mapping: MappingConfig = { sourceModel: source, targetModel: target };
 
   // Resolve real Anthropic IP before hijacking DNS
-  console.log(`\n📡 Resolving ${ANTHROPIC_HOST}...`);
+  if (!daemon) console.log(`\n📡 Resolving ${ANTHROPIC_HOST}...`);
   const realIP = await initAnthropicIP();
-  console.log(`   → Real IP: ${realIP} (cached)`);
+  if (!daemon) console.log(`   → Real IP: ${realIP} (cached)`);
 
   // Hijack DNS
-  console.log(`\n📝 Updating /etc/hosts...`);
+  if (!daemon) console.log(`\n📝 Updating /etc/hosts...`);
   addHostsEntry();
 
   // Start HTTPS server
@@ -285,21 +344,29 @@ async function startInterceptor(source: string, target: string): Promise<void> {
   if (!fs.existsSync(CMM_DIR)) fs.mkdirSync(CMM_DIR, { recursive: true });
   fs.writeFileSync(PID_FILE_PATH, String(process.pid));
 
-  console.log(`\n🔌 HTTPS interceptor started: https://127.0.0.1:443`);
-  console.log(`\n✅ Active! Mapping:`);
-  console.log(`   ${source}* → ${target}`);
-  console.log(`   other models → ${ANTHROPIC_HOST} (${realIP})`);
-  console.log(`\n📊 Log:`);
+  if (daemon) {
+    console.log(`cmm daemon started: ${source} -> ${target} (PID ${process.pid})`);
+  } else {
+    console.log(`\n🔌 HTTPS interceptor started: https://127.0.0.1:443`);
+    console.log(`\n✅ Active! Mapping:`);
+    console.log(`   ${source}* → ${target}`);
+    console.log(`   other models → ${ANTHROPIC_HOST} (${realIP})`);
+    console.log(`\n📊 Log:`);
+  }
 
   // Graceful shutdown (guard against double invocation)
   let shuttingDown = false;
   const shutdownHandler = () => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log('\n');
+    if (!daemon) console.log('\n');
     server.close();
     cleanup();
-    console.log('✅ Clean shutdown');
+    if (daemon) {
+      console.log('cmm daemon stopped');
+    } else {
+      console.log('✅ Clean shutdown');
+    }
     process.exit(0);
   };
 

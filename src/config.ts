@@ -50,6 +50,9 @@ export const SERVER_CERT_PATH = path.join(CMM_DIR, 'server.crt');
 export const IP_CACHE_PATH = path.join(CMM_DIR, 'anthropic-ip.cache');
 export const PID_FILE_PATH = path.join(CMM_DIR, 'cmm.pid');
 
+export const PLIST_LABEL = 'dev.curebal.cmm';
+export const PLIST_PATH = `/Library/LaunchDaemons/${PLIST_LABEL}.plist`;
+
 export const ANTHROPIC_HOST = 'api.anthropic.com';
 export const HOSTS_MARKER = '# cmm-managed';
 

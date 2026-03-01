@@ -8,6 +8,7 @@
   <meta property="og:title" content="cmm — Claude Model Mapping">
   <meta property="og:description" content="Transparent OS-level model interception for Claude Code. Redirect any Claude model via CLIProxyAPI.">
   <meta property="og:type" content="website">
+  <link rel="icon" type="image/png" href="favicon.png">
   <style>
     :root {
       --bg: #0d1117;
@@ -425,6 +426,11 @@
           <h3>Easy Config</h3>
           <p>Built-in CLI for proxy settings. <code>cmm config set PROXY_API_KEY sk-...</code> — no file editing needed.</p>
         </div>
+        <div class="feature-card">
+          <div class="icon">&#9881;</div>
+          <h3>Service Mode</h3>
+          <p>Run as a macOS launchd daemon. Auto-starts on boot, auto-restarts on crash. No terminal window needed.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -478,6 +484,46 @@
 
 <span class="comment"># Terminal 2: Use Claude Code normally</span>
 <span class="cmd">claude</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Service Mode -->
+  <section class="steps">
+    <div class="container">
+      <h2>Service Mode</h2>
+      <p style="text-align:center;color:var(--text-muted);margin-bottom:32px;font-size:15px;">Run cmm as a macOS launchd daemon — no terminal window required.</p>
+
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <h3>Install and start</h3>
+          <p>Creates a LaunchDaemon that auto-starts on boot and auto-restarts on crash.</p>
+          <pre><span class="cmd">sudo cmm service install claude-haiku-4-5 gemini-2.5-flash</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <h3>Manage</h3>
+          <pre><span class="comment"># Check status</span>
+<span class="cmd">sudo cmm service status</span>
+
+<span class="comment"># Stop / start / restart</span>
+<span class="cmd">sudo cmm service stop</span>
+<span class="cmd">sudo cmm service start</span>
+<span class="cmd">sudo cmm service restart</span></pre>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-content">
+          <h3>Remove</h3>
+          <p>Stops the service and removes the LaunchDaemon plist.</p>
+          <pre><span class="cmd">sudo cmm service uninstall</span></pre>
         </div>
       </div>
     </div>

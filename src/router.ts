@@ -74,12 +74,18 @@ export function createRouter(mapping: MappingConfig) {
             return;
           }
 
-          // Passthrough — send as-is; on thinking signature error, retry without thinking blocks
-          log(`${model.padEnd(35)} → PASSTHROUGH ✓`);
-          forwardToAnthropic(req.method || 'GET', req.url || '/', req.headers, rawBody, res, () => {
-            log(`${model.padEnd(35)} → PASSTHROUGH (retry without thinking blocks)`);
-            return stripThinkingBlocks(body);
-          });
+          // Passthrough — strip thinking blocks from history to avoid signature errors
+          const hasThinking = bodyHasThinkingBlocks(body);
+          if (hasThinking) {
+            logThinkingBlockDetails(body);
+          }
+          const passBody = hasThinking ? stripThinkingBlocks(body) : rawBody;
+          if (hasThinking) {
+            log(`${model.padEnd(35)} → PASSTHROUGH (stripped thinking blocks, ${rawBody.length}B → ${passBody.length}B) ✓`);
+          } else {
+            log(`${model.padEnd(35)} → PASSTHROUGH ✓`);
+          }
+          forwardToAnthropic(req.method || 'GET', req.url || '/', req.headers, passBody, res);
           return;
         } catch {
           // JSON parse failed — passthrough anyway
@@ -109,6 +115,36 @@ export function createRouter(mapping: MappingConfig) {
 }
 
 /**
+ * Log detailed info about thinking blocks found in the body.
+ */
+function logThinkingBlockDetails(body: AnthropicRequest): void {
+  if (!body.messages) return;
+  const pad = '  ';
+  body.messages.forEach((msg, i) => {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return;
+    const blocks = msg.content as AnthropicContentBlock[];
+    const types = blocks.map(b => b.type);
+    const thinkingCount = types.filter(t => t === 'thinking' || t === 'redacted_thinking').length;
+    if (thinkingCount > 0) {
+      log(`${pad}msg[${i}] assistant: ${blocks.length} blocks [${types.join(', ')}] → ${thinkingCount} thinking block(s) to strip`);
+    }
+  });
+}
+
+/**
+ * Check if any assistant message in the body contains thinking blocks.
+ */
+function bodyHasThinkingBlocks(body: AnthropicRequest): boolean {
+  if (!body.messages) return false;
+  return body.messages.some(msg => {
+    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return false;
+    return (msg.content as AnthropicContentBlock[]).some(
+      block => block.type === 'thinking' || block.type === 'redacted_thinking'
+    );
+  });
+}
+
+/**
  * Strip thinking blocks from assistant messages in conversation history.
  * Prevents "Invalid signature in thinking block" errors when conversations
  * cross provider boundaries (CLIProxyAPI ↔ real Anthropic API).
@@ -119,9 +155,10 @@ function stripThinkingBlocks(body: AnthropicRequest): Buffer {
     messages: body.messages?.map(msg => {
       if (msg.role !== 'assistant' || !Array.isArray(msg.content)) return msg;
       const filtered = (msg.content as AnthropicContentBlock[]).filter(
-        block => block.type !== 'thinking'
+        block => block.type !== 'thinking' && block.type !== 'redacted_thinking'
       );
-      if (filtered.length === 0) return msg;
+      // If all blocks were thinking, replace with minimal text to keep message valid
+      if (filtered.length === 0) return { ...msg, content: [{ type: 'text', text: '...' }] };
       return { ...msg, content: filtered };
     }),
   };
